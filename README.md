@@ -1,3 +1,15 @@
+## I've added this in the fork:
+- ServiceBlacklist - You can now blacklist domains like youporn etc..
+- !remove [number] - You can now remove a specific song from the queue
+- !undo - You can now delete the last added song in the queue
+
+And I've added "Autoplaylist improvement"
+```
+The autoplaylist now remembers which songs have been played and makes sure to play new ones. 
+Once every song has been played, the playlist is restarted.
+```
+
+
 # RhinoBot: The music bot for Discord.
 
 MusicBot is a Discord music bot written in [Python](https://www.python.org "Python homepage"). It plays requested songs and if the queue becomes empty it will play through a list of existing songs.
