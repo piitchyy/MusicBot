@@ -64,6 +64,7 @@ class MusicBot(discord.Client):
 
         self.blacklist = set(load_file(self.config.blacklist_file))
         self.autoplaylist = load_file(self.config.auto_playlist_file)
+        self.song_list = self.autoplaylist[:]
 
         self.aiolocks = defaultdict(asyncio.Lock)
         self.downloader = downloader.Downloader(download_folder='audio_cache')
@@ -625,8 +626,12 @@ class MusicBot(discord.Client):
     async def on_player_finished_playing(self, player, **_):
         if not player.playlist.entries and not player.current_entry and self.config.auto_playlist:
             while self.autoplaylist:
-                random.shuffle(self.autoplaylist)
-                song_url = random.choice(self.autoplaylist)
+                random.shuffle(self.song_list)
+                if (len(self.song_list) == 0):
+                    print('All songs have been played. Restarting auto playlist...')
+                    self.song_list = self.autoplaylist[:]
+                song_url = random.choice(self.song_list)
+                self.song_list.remove(song_url)
 
                 info = {}
 
@@ -1239,6 +1244,21 @@ class MusicBot(discord.Client):
         except:
             raise exceptions.CommandError('Invalid URL provided:\n{}\n'.format(server_link), expire_in=30)
 
+
+    async def cmd_undo(self, player):
+        """
+        Usage:
+            {command_prefix}undo
+
+        Removes the last song added to the queue.
+        """
+        try:
+            song = player.playlist.undo()
+        except IndexError:
+            return Response("There are no songs to remove.", delete_after=30)
+        return Response("Removed **{}**".format(song.title), delete_after=30)
+
+
     async def cmd_play(self, player, channel, author, permissions, leftover_args, song_url):
         """
         Usage:
@@ -1271,6 +1291,13 @@ class MusicBot(discord.Client):
                 "That video cannot be played.  Try using the {}stream command.".format(self.config.command_prefix),
                 expire_in=30
             )
+
+        if permissions.service_blacklist and info.get('extractor', '').lower() in permissions.service_blacklist:
+            raise exceptions.PermissionsError(
+                "You are not permitted to queue songs from this service (%s)" % info.get('extractor', '').lower(), expire_in=30
+            )
+        print(info)
+
 
         # abstract the search handling away from the user
         # our ytdl options allow us to use search strings as input urls
@@ -1906,6 +1933,37 @@ class MusicBot(discord.Client):
                 reply=True,
                 delete_after=20
             )
+
+    async def cmd_remove(self, message, player, index):
+        """
+        Usage:
+        {command_prefix}remove [number]
+
+        Removes a song from the queue at the given position, where the position is a number from {command_prefix}queue.
+        """
+
+        if not player.playlist.entries:
+            raise exceptions.CommandError("There are no songs queued.", expire_in=20)
+
+        try:
+            index = int(index)
+
+        except ValueError:
+            raise exceptions.CommandError('{} is not a valid number.'.format(index), expire_in=20)
+
+        if 0 < index <= len(player.playlist.entries):
+            try:
+                song_title = player.playlist.entries[index-1].title
+                player.playlist.remove_entry((index)-1)
+
+            except IndexError:
+                raise exceptions.CommandError("Something went wrong while the song was being removed. Try again with a new position from `" + self.config.command_prefix + "queue`", expire_in=20)
+
+            return Response("\N{CHECK MARK} removed **" + song_title + "**", delete_after=20)
+
+        else:
+            raise exceptions.CommandError("You can't remove the current song (skip it instead), or a song in a position that doesn't exist.", expire_in=20)
+
 
     async def cmd_volume(self, message, player, new_volume=None):
         """

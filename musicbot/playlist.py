@@ -42,6 +42,9 @@ class Playlist(EventEmitter, Serializable):
     def clear(self):
         self.entries.clear()
 
+    def undo(self):
+        return self.entries.pop()
+
     async def add_entry(self, song_url, **meta):
         """
             Validates and adds a song_url to be played. This does not start the download of the song.
@@ -294,6 +297,10 @@ class Playlist(EventEmitter, Serializable):
 
         if self.peek() is entry:
             entry.get_ready_future()
+
+    def remove_entry(self, index):
+        del self.entries[index]
+
 
     async def get_next_entry(self, predownload_next=True):
         """
